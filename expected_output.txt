@@ -1,0 +1,9 @@
+                    @timestamp                                                SourceImage GrantedAccess  is_attack
+817   2020-08-07T14:32:48.988Z                            C:\windows\system32\svchost.exe        0x1000      False
+821   2020-08-07T14:32:48.990Z                            C:\windows\system32\svchost.exe        0x1000      False
+2450  2020-08-07T14:32:57.589Z  C:\windows\System32\WindowsPowerShell\v1.0\powershell.exe        0x1010       True
+4205  2020-08-07T14:33:45.279Z                            C:\windows\system32\svchost.exe        0x2000      False
+
+v0 任何處理程序存取 lsass: 警示 4，攻擊 1，誤報 3
+v1 排除 svchost.exe: 警示 1，攻擊 1，誤報 0
+v2 權限含 PROCESS_VM_READ(0x0010): 警示 1，攻擊 1，誤報 0
