@@ -6,7 +6,7 @@ A small pilot observation: **how many alerts, true detections and false positive
 
 This is the pilot behind a research question: *when a detection rule is adjusted to reduce false positives, how much detection capability is lost, and can the adjustment be evaded?*
 
-> **Status: pilot only.** One dataset, one attack run, four events. It shows that the question is worth studying. It does **not** estimate how well any rule performs.
+> **Status: pilot only.** The baseline is one dataset, one attack run, four events; an extended check adds 10 attack executions (see below). Both only show that the question is worth studying. Neither estimates how well any rule performs.
 
 ## What it does
 
@@ -30,6 +30,30 @@ python3 lsass_rule_version_comparison.py --verbose         # also prints dataset
 ```
 
 The output should match [`expected_output.txt`](expected_output.txt). Printed labels are in Chinese.
+
+## Extended observation: 10 attack executions
+
+To check that the pattern is not an artefact of one recording, `lsass_rule_multi_run.py` applies the same v0–v2 rules to 10 attack executions from the same project (8 technique groups, such as nanodump, comsvcs MiniDump, Dumpert, SharpDump, procdump, Metasploit payload and a renamed Mimikatz; commit `d9d40ef`). The unit is **one attack execution**, not one event.
+
+```bash
+python3 lsass_rule_multi_run.py --root PATH/TO/Security-Datasets/datasets   # local checkout at the pinned commit
+python3 lsass_rule_multi_run.py                                            # or download the 10 zips
+python3 lsass_rule_multi_run.py --events --hashes                          # per-event detail, zip SHA-256
+```
+
+Output should match [`expected_output_multi_run.txt`](expected_output_multi_run.txt).
+
+| | v0 | v1 (no svchost) | v2 (needs VM_READ) |
+|---|---|---|---|
+| Attack-related events alerted (26 in total) | 26 | 26 | 19 |
+| Executions with at least one alert (of 10) | 10 | 10 | 10 |
+| Alerts on unlabelled events (not verified) | 2,551 | 1,857 | 7 |
+
+What it shows: v2 drops 7 of 26 attack-related events (their access masks lack VM_READ) yet every execution still raises at least one alert, so event-level and execution-level results differ. What it cannot show: with only 10 executions the Wilson 95% lower bound for 10/10 is about 72%, and v1 vs v2 cannot be judged on false positives because the non-attack events are unverified system activity.
+
+**How events are labelled.** An event is "attack-related" only if the source process's own Sysmon Event ID 1 record (matched by ProcessGuid) contains the tool name or command-line argument listed per run in the script. The label does not use any rule condition, so it is not circular with v1 or v2. Every other lsass event is "unlabelled" and is deliberately **not** called a false positive.
+
+**Not included.** `empire_mimikatz_logonpasswords` (the baseline above) and other Empire recordings have no process-creation events to verify labels, so they stay provisional. `rdp_interactive_taskmanager_lsass_dump` needs manual review (Task Manager also touches lsass routinely). `empire_mimikatz_sam_access` has 1,477 accesses by one process within 0.44 s and would count as one execution. Several payload accesses (0x1000/0x1400) are labelled attack-related from the process evidence, but whether each one is part of the credential theft has not been checked. These are listed for transparency; none are used above.
 
 ## Reproducibility notes
 
