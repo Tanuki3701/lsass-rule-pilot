@@ -6,7 +6,7 @@
 
 這是以下研究問題的前導觀察：*偵測規則為了降低誤報而調整後，會損失多少偵測能力？這種調整是否容易被規避？*
 
-> **僅為前導觀察。** 單一資料集、一次攻擊執行、4 筆事件，只用來確認此現象值得進一步研究。**不**用來評估任何規則的實際效果。
+> **僅為前導觀察。** 基準為單一資料集、一次攻擊執行、4 筆事件；另有擴充觀察（10 次攻擊執行，見下）。兩者都只用來確認此現象值得進一步研究，**不**用來評估任何規則的實際效果。
 
 ## 程式功能
 
@@ -30,6 +30,30 @@ python3 lsass_rule_version_comparison.py --verbose         # 另外印出資料�
 ```
 
 輸出應與 [`expected_output.txt`](expected_output.txt) 一致。程式輸出的標籤為中文。
+
+## 擴充觀察：10 次攻擊執行
+
+為確認上述現象不是單一錄製的偶然，`lsass_rule_multi_run.py` 把同樣的 v0–v2 規則套用到同一專案的 10 次攻擊執行（8 個技術群組，例如 nanodump、comsvcs MiniDump、Dumpert、SharpDump、procdump、Metasploit 載荷與更名 Mimikatz；commit `d9d40ef`）。統計單位是**一次攻擊執行**，不是單一事件。
+
+```bash
+python3 lsass_rule_multi_run.py --root PATH/TO/Security-Datasets/datasets   # 本機 checkout（固定 commit）
+python3 lsass_rule_multi_run.py                                            # 或自動下載 10 個 zip
+python3 lsass_rule_multi_run.py --events --hashes                          # 逐筆事件、zip 的 SHA-256
+```
+
+輸出應與 [`expected_output_multi_run.txt`](expected_output_multi_run.txt) 一致（標籤為英文）。
+
+| | v0 | v1（排除 svchost） | v2（需含 VM_READ） |
+|---|---|---|---|
+| 攻擊相關事件有警示（共 26 筆） | 26 | 26 | 19 |
+| 至少有 1 筆警示的攻擊執行（共 10 次） | 10 | 10 | 10 |
+| 未標記事件的警示（未驗證） | 2,551 | 1,857 | 7 |
+
+能看出的：v2 漏掉 26 筆攻擊相關事件中的 7 筆（存取權限不含 VM_READ），但每次攻擊執行仍至少觸發一筆警示，可見「以事件計」與「以攻擊執行計」的結果不同。看不出的：只有 10 次執行，10/10 的 Wilson 95% 下界約 72%；且非攻擊事件屬未驗證的系統活動，無法據此判斷 v1 與 v2 的誤報優劣。
+
+**標記方式。** 只有當來源程序自己的 Sysmon Event ID 1 紀錄（以 ProcessGuid 對應）含有程式中各次執行所列的工具名稱或命令列參數，該事件才標為「攻擊相關」。標記不使用任何規則條件，因此與 v1、v2 不會形成循環論證。其餘 lsass 事件為「未標記」，刻意**不**稱為誤報。
+
+**未納入。** 上方基準使用的 `empire_mimikatz_logonpasswords` 與其他 Empire 錄製沒有程序建立事件可佐證，標記維持暫定；`rdp_interactive_taskmanager_lsass_dump` 需人工判定（工作管理員平常也會存取 lsass）；`empire_mimikatz_sam_access` 由單一程序在 0.44 秒內存取 1,477 次，只能算一次執行。若干攻擊載荷程序的存取（0x1000/0x1400）依程序證據標為攻擊相關，但每一筆是否屬於憑證竊取行為尚未逐筆確認。以上僅為揭露，皆未用於上表。
 
 ## 可重現性說明
 
